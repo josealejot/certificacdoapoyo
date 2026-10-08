@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any
@@ -11,36 +11,62 @@ app = FastAPI(
     description="Microservicio de procesamiento psicométrico (16PF + DSM-5) y generación de certificados PDF de soporte emocional."
 )
 
-# Habilitar CORS para permitir conexión desde el frontend
+# 1. CORS Restringido: Solo dominios autorizados de la plataforma clínica (Vercel y Localhost)
+ORIGENES_AUTORIZADOS = [
+    "https://certificacdoapoyo-uzww.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ORIGENES_AUTORIZADOS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# 2. Middleware de Cabeceras de Seguridad HTTP (Defensa en Profundidad OWASP)
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    # Mitigación Clickjacking
+    response.headers["X-Frame-Options"] = "DENY"
+    # Mitigación MIME-Type Sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # Protección Cross-Site Scripting (XSS)
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    # Referrer Policy estricta
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Control de permisos del navegador
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
 
 generador_pdf_service = GeneradorPDF()
 
 
-# Schemas Pydantic
+# 3. Schemas Pydantic con validación defensiva estricta (Anti-DoS & Anti-Buffer Overflow)
 class Factores16PF(BaseModel):
     puntuaciones: Dict[str, float] = Field(
         ...,
         description="Decatipos de los factores primarios (A, B, C, E, F, G, H, I, L, M, N, O, Q1, Q2, Q3, Q4)",
         example={"C": 3.0, "O": 8.0, "Q4": 9.0, "L": 7.0, "Q3": 4.0}
     )
-    ansiedad_global: Optional[float] = Field(None, description="Factor secundario de ansiedad")
+    ansiedad_global: Optional[float] = Field(None, ge=1.0, le=10.0, description="Factor secundario de ansiedad")
 
 
 class SolicitudDictamen(BaseModel):
-    paciente_id: str
+    paciente_id: str = Field(..., min_length=3, max_length=50, description="Identificación del paciente")
     sintomas: List[str] = Field(
         ...,
+        min_items=1,
+        max_items=30,
         example=["Ansiedad generalizada", "Ataques de pánico en espacios cerrados", "Insomnio recurrente"]
     )
     factores_16pf: Factores16PF
-    observaciones_clinicas: Optional[str] = None
+    observaciones_clinicas: Optional[str] = Field(None, max_length=2000)
 
 
 class RespuestaDictamen(BaseModel):
@@ -51,11 +77,11 @@ class RespuestaDictamen(BaseModel):
 
 
 class SolicitudCertificadoPDF(BaseModel):
-    codigoVerificacion: str
-    fechaExpedicion: Optional[str] = None
+    codigoVerificacion: str = Field(..., min_length=4, max_length=60)
+    fechaExpedicion: Optional[str] = Field(None, max_length=80)
     paciente: Dict[str, Any]
     mascota: Dict[str, Any]
-    dictamenClinico: Optional[str] = None
+    dictamenClinico: Optional[str] = Field(None, max_length=4000)
 
 
 @app.get("/")

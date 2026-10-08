@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './services/firebase';
 import { registrarCertificadoEnFirestore } from './services/firestoreService';
+import LoginPage from './features/auth/LoginPage';
 
 const FASTAPI_URL = import.meta.env.VITE_API_IA_PDF_URL || 'https://mae-backend-pdf.onrender.com';
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [paciente, setPaciente] = useState({
     nombres: 'María Camila',
     apellidos: 'Restrepo Gómez',
@@ -34,6 +40,23 @@ export default function App() {
   const [loadingPDF, setLoadingPDF] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [firestoreStatus, setFirestoreStatus] = useState(null);
+
+  // Escuchar estado de autenticación en Firebase
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleCerrarSesion = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('Error al cerrar sesión:', err);
+    }
+  };
 
   const handleAnalizarIA = async () => {
     setLoadingIA(true);
@@ -112,6 +135,20 @@ export default function App() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white">
+        <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-sm font-medium text-slate-300">Verificando sesión criptográfica segura...</p>
+      </div>
+    );
+  }
+
+  // Si no ha iniciado sesión, mostrar la pantalla exclusiva de Login
+  if (!currentUser) {
+    return <LoginPage />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
       {/* Encabezado Institucional y Profesional */}
@@ -123,6 +160,10 @@ export default function App() {
                 Ley 1090 de 2006
               </span>
               <span className="text-slate-400 text-xs">Colombia</span>
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1 ml-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Sesión Activa: {currentUser.email}
+              </span>
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
               Plataforma Clínica de Certificados MAE
@@ -131,11 +172,21 @@ export default function App() {
               Evaluación Psicológica, Diagnóstico DSM-5 y Expedición Oficial de Apoyo Emocional
             </p>
           </div>
-          <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700 text-right">
-            <p className="text-xs text-sky-400 font-semibold uppercase">Profesional Responsable</p>
-            <p className="text-sm font-bold text-slate-100">José Alejandro Tangarife David</p>
-            <p className="text-xs text-slate-300">Psicólogo Clínico | Esp. en Seguridad y Salud en el Trabajo</p>
-            <p className="text-[11px] text-slate-400">TP Colpsic 184919 | RETHUS Res. 5413719</p>
+          <div className="flex items-center gap-3">
+            <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700 text-right">
+              <p className="text-xs text-sky-400 font-semibold uppercase">Profesional Responsable</p>
+              <p className="text-sm font-bold text-slate-100">José Alejandro Tangarife David</p>
+              <p className="text-xs text-slate-300">Psicólogo Clínico | Esp. en Seguridad y Salud en el Trabajo</p>
+              <p className="text-[11px] text-slate-400">TP Colpsic 184919 | RETHUS Res. 5413719</p>
+            </div>
+            <button
+              onClick={handleCerrarSesion}
+              title="Cerrar Sesión Segura"
+              className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold rounded-lg transition cursor-pointer flex flex-col items-center gap-1"
+            >
+              <span>🔒</span>
+              <span>Salir</span>
+            </button>
           </div>
         </div>
       </header>

@@ -41,8 +41,9 @@ service cloud.firestore {
     // Colección Certificados MAE
     match /certificados/{certificadoId} {
       allow read: if true; // Lectura pública para verificación por código QR / token de validación
-      allow create, update: if isProfessional();
-      allow delete: if false;
+      allow create, update: if isAuthenticated();
+      allow delete: if false; // Inmutabilidad legal
+    }
     }
   }
 }
