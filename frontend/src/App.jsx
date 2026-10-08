@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { registrarCertificadoEnFirestore } from './services/firestoreService';
 
 const FASTAPI_URL = 'http://localhost:8000';
 
@@ -32,6 +33,7 @@ export default function App() {
   const [loadingIA, setLoadingIA] = useState(false);
   const [loadingPDF, setLoadingPDF] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [firestoreStatus, setFirestoreStatus] = useState(null);
 
   const handleAnalizarIA = async () => {
     setLoadingIA(true);
@@ -57,11 +59,15 @@ export default function App() {
   const handleDescargarPDF = async () => {
     setLoadingPDF(true);
     setErrorMsg(null);
+    setFirestoreStatus(null);
+    const codigoVerificacion = `MAE-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+
     try {
+      // 1. Descarga del documento PDF
       const res = await axios.post(
         `${FASTAPI_URL}/generar-pdf`,
         {
-          codigoVerificacion: `MAE-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+          codigoVerificacion: codigoVerificacion,
           fechaExpedicion: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }),
           paciente: paciente,
           mascota: mascota,
@@ -78,9 +84,29 @@ export default function App() {
       document.body.appendChild(link);
       link.click();
       link.remove();
+
+      // 2. Registro síncrono en Firestore en la nube
+      const guardado = await registrarCertificadoEnFirestore({
+        paciente,
+        mascota,
+        dictamenClinico: dictamenIA ? dictamenIA.fundamentacion_dsm5 : undefined,
+        codigoVerificacion,
+      });
+
+      if (guardado.success) {
+        setFirestoreStatus({
+          tipo: 'success',
+          mensaje: `Certificado ${codigoVerificacion} guardado exitosamente en tu Firestore (ID: ${guardado.id})`,
+        });
+      } else {
+        setFirestoreStatus({
+          tipo: 'warning',
+          mensaje: `PDF descargado. Nota sobre Firestore: ${guardado.error} (Verifica que creaste la base en la consola de Firebase)`,
+        });
+      }
     } catch (err) {
       console.error(err);
-      setErrorMsg('Error al descargar el PDF. Verifica que el servidor FastAPI esté corriendo.');
+      setErrorMsg('Error al generar o descargar el PDF. Verifica que el servidor FastAPI esté corriendo.');
     } finally {
       setLoadingPDF(false);
     }
@@ -122,6 +148,13 @@ export default function App() {
             <div className="p-4 bg-amber-50 border-l-4 border-amber-500 text-amber-900 rounded text-sm">
               <p className="font-semibold">Aviso de Conexión:</p>
               <p>{errorMsg}</p>
+            </div>
+          )}
+
+          {firestoreStatus && (
+            <div className={`p-4 border-l-4 rounded text-sm ${firestoreStatus.tipo === 'success' ? 'bg-emerald-50 border-emerald-500 text-emerald-900' : 'bg-sky-50 border-sky-500 text-sky-900'}`}>
+              <p className="font-semibold">{firestoreStatus.tipo === 'success' ? '☁ Base de Datos Sincronizada:' : '☁ Estado de Firestore:'}</p>
+              <p>{firestoreStatus.mensaje}</p>
             </div>
           )}
 
