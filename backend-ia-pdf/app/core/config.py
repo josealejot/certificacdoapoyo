@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # Datos Globales del Profesional (Constantes del Sistema)
     PROFESIONAL_NOMBRE: str = "José Alejandro Tangarife David"
-    PROFESIONAL_TITULO: str = "Psicólogo Clínico y Social"
+    PROFESIONAL_TITULO: str = "Psicólogo Clínico | Especialista en Seguridad y Salud en el Trabajo"
     PROFESIONAL_COLPSIC: str = "Tarjeta Profesional Colpsic 184919"
     PROFESIONAL_RETHUS: str = "RETHUS Res. 5413719"
     PROFESIONAL_REGISTRO_COMPLETO: str = (

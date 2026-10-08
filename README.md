@@ -5,7 +5,7 @@
 
 ## Constantes del Profesional Responsable
 - **Profesional:** José Alejandro Tangarife David
-- **Título:** Psicólogo Clínico y Social
+- **Título:** Psicólogo Clínico | Especialista en Seguridad y Salud en el Trabajo
 - **Acreditación:** Tarjeta Profesional Colpsic 184919 | RETHUS Res. 5413719
 
 ---

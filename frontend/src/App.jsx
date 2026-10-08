@@ -134,7 +134,7 @@ export default function App() {
           <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700 text-right">
             <p className="text-xs text-sky-400 font-semibold uppercase">Profesional Responsable</p>
             <p className="text-sm font-bold text-slate-100">José Alejandro Tangarife David</p>
-            <p className="text-xs text-slate-300">Psicólogo Clínico y Social</p>
+            <p className="text-xs text-slate-300">Psicólogo Clínico | Esp. en Seguridad y Salud en el Trabajo</p>
             <p className="text-[11px] text-slate-400">TP Colpsic 184919 | RETHUS Res. 5413719</p>
           </div>
         </div>

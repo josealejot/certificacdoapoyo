@@ -126,7 +126,7 @@ public class HistoriaClinica {
         public static ProfesionalTratante porDefecto() {
             return new ProfesionalTratante(
                     "José Alejandro Tangarife David",
-                    "Psicólogo Clínico y Social",
+                    "Psicólogo Clínico | Especialista en Seguridad y Salud en el Trabajo",
                     "184919",
                     "Res. 5413719"
             );
