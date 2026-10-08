@@ -2,48 +2,37 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // En un esquema clínico según Ley 1090 de 2006, sólo el profesional autorizado o el rol terapeuta
-    // debe tener acceso de escritura/lectura a las historias clínicas.
-    function isOwnerOrProfessional(userId) {
-      return isAuthenticated() && (request.auth.uid == userId || request.auth.token.role == 'PROFESIONAL');
+    // Único profesional autorizado con potestad legal y custodia clínica
+    function isAuthorizedDoctor() {
+      return isAuthenticated() && request.auth.token.email == 'josealejot@gmail.com';
     }
 
-    function isProfessional() {
-      return isAuthenticated() && request.auth.token.role == 'PROFESIONAL';
-    }
-
-    // Colección Pacientes
+    // Colección Pacientes: Solo el Dr. José Alejandro puede gestionar pacientes
     match /pacientes/{pacienteId} {
-      allow read: if isAuthenticated() && (request.auth.uid == pacienteId || isProfessional());
-      allow create: if isAuthenticated();
-      allow update, delete: if isProfessional();
+      allow read, write: if isAuthorizedDoctor();
     }
 
-    // Colección Historias Clínicas (Custodia estricta Ley 1090 / Res. 1995 de 1999)
+    // Colección Historias Clínicas: Custodia estricta Ley 1090 / Res. 1995 de 1999
     match /historias_clinicas/{historiaId} {
-      allow read: if isProfessional() || (isAuthenticated() && resource.data.pacienteId == request.auth.uid);
-      allow create, update: if isProfessional();
-      allow delete: if false; // Por ley, las historias clínicas no deben eliminarse
+      allow read, write: if isAuthorizedDoctor();
+      allow delete: if false; // Prohibición legal de eliminación
     }
 
     // Colección Evaluaciones 16PF
     match /evaluaciones_16pf/{evaluacionId} {
-      allow read: if isProfessional() || (isAuthenticated() && resource.data.pacienteId == request.auth.uid);
-      allow create: if isAuthenticated();
-      allow update, delete: if isProfessional();
+      allow read, write: if isAuthorizedDoctor();
+      allow delete: if false;
     }
 
     // Colección Certificados MAE
     match /certificados/{certificadoId} {
-      allow read: if true; // Lectura pública para verificación por código QR / token de validación
-      allow create, update: if isAuthenticated();
-      allow delete: if false; // Inmutabilidad legal
-    }
+      allow read: if true; // Lectura pública para verificación por código QR
+      allow create, update: if isAuthorizedDoctor(); // Solo el Dr. puede emitir certificados
+      allow delete: if false; // Inmutabilidad legal del documento
     }
   }
 }
