@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { registrarCertificadoEnFirestore } from './services/firestoreService';
 
-const FASTAPI_URL = 'http://localhost:8000';
+const FASTAPI_URL = import.meta.env.VITE_API_IA_PDF_URL || 'http://localhost:8000';
 
 export default function App() {
   const [paciente, setPaciente] = useState({
