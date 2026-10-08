@@ -1,3 +1,4 @@
+import os
 from fpdf import FPDF
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -159,10 +160,34 @@ class GeneradorPDF:
         pdf.ln(8)
 
         # Bloque de Firma Profesional
+        pdf.ln(3)
+
+        # Localizar e insertar la firma caligráfica profesional
+        assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets")
+        firma_path = os.path.join(assets_dir, "firma_profesional.png")
+
+        if os.path.exists(firma_path):
+            ancho_firma = 65
+            alto_firma = ancho_firma * (330 / 1024)  # Proporción exacta original ~20.9mm
+            x_firma = (pdf.w - ancho_firma) / 2
+            y_base = pdf.get_y()
+            pdf.image(firma_path, x=x_firma, y=y_base, w=ancho_firma)
+
+            # Posicionar la línea sutil de firma
+            pdf.set_y(y_base + alto_firma + 1)
+            pdf.set_draw_color(70, 80, 95)
+            pdf.set_line_width(0.35)
+            pdf.line(55, pdf.get_y(), pdf.w - 55, pdf.get_y())
+            pdf.ln(3)
+        else:
+            pdf.set_font("Helvetica", "B", 9.5)
+            pdf.cell(0, 5, "__________________________________________________", ln=True, align="C")
+
         pdf.set_font("Helvetica", "B", 9.5)
-        pdf.cell(0, 5, "__________________________________________________", ln=True, align="C")
+        pdf.set_text_color(24, 43, 73)
         pdf.cell(0, 5, settings.PROFESIONAL_NOMBRE, ln=True, align="C")
         pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(70, 80, 95)
         pdf.cell(0, 4, settings.PROFESIONAL_TITULO, ln=True, align="C")
         pdf.cell(0, 4, settings.PROFESIONAL_REGISTRO_COMPLETO, ln=True, align="C")
 
