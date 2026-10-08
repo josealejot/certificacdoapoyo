@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // En un esquema clínico según Ley 1090 de 2006, sólo el profesional autorizado o el rol terapeuta
+    // debe tener acceso de escritura/lectura a las historias clínicas.
+    function isOwnerOrProfessional(userId) {
+      return isAuthenticated() && (request.auth.uid == userId || request.auth.token.role == 'PROFESIONAL');
+    }
+
+    function isProfessional() {
+      return isAuthenticated() && request.auth.token.role == 'PROFESIONAL';
+    }
+
+    // Colección Pacientes
+    match /pacientes/{pacienteId} {
+      allow read: if isAuthenticated() && (request.auth.uid == pacienteId || isProfessional());
+      allow create: if isAuthenticated();
+      allow update, delete: if isProfessional();
+    }
+
+    // Colección Historias Clínicas (Custodia estricta Ley 1090 / Res. 1995 de 1999)
+    match /historias_clinicas/{historiaId} {
+      allow read: if isProfessional() || (isAuthenticated() && resource.data.pacienteId == request.auth.uid);
+      allow create, update: if isProfessional();
+      allow delete: if false; // Por ley, las historias clínicas no deben eliminarse
+    }
+
+    // Colección Evaluaciones 16PF
+    match /evaluaciones_16pf/{evaluacionId} {
+      allow read: if isProfessional() || (isAuthenticated() && resource.data.pacienteId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update, delete: if isProfessional();
+    }
+
+    // Colección Certificados MAE
+    match /certificados/{certificadoId} {
+      allow read: if true; // Lectura pública para verificación por código QR / token de validación
+      allow create, update: if isProfessional();
+      allow delete: if false;
+    }
+  }
+}

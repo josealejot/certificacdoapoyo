@@ -1,0 +1,40 @@
+# Dependencias
+node_modules/
+frontend/node_modules/
+*/node_modules/
+
+# Python Virtualenvs & Cache
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+venv/
+backend-ia-pdf/venv/
+.env
+*/.env
+*.env.local
+
+# Java & Maven
+target/
+backend-core/target/
+*.class
+.mvn/
+*.jar
+
+# Secretos y Credenciales de Firebase (¡NUNCA SUBIR A GITHUB!)
+serviceAccountKey.json
+firebase-adminsdk*.json
+*credentials*.json
+.firebase/
+
+# IDEs y SO
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+.DS_Store
+Thumbs.db
+dist/
+frontend/dist/
