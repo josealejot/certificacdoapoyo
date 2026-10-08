@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any
 from app.core.config import settings
 from app.services.generador_pdf import GeneradorPDF
+from app.services.ia_service import IAService
 
 app = FastAPI(
     title=settings.APP_TITLE,
@@ -45,6 +46,7 @@ async def security_headers_middleware(request: Request, call_next):
     return response
 
 generador_pdf_service = GeneradorPDF()
+ia_service = IAService()
 
 
 # 3. Schemas Pydantic con validación defensiva estricta (Anti-DoS & Anti-Buffer Overflow)
@@ -82,6 +84,23 @@ class SolicitudCertificadoPDF(BaseModel):
     paciente: Dict[str, Any]
     mascota: Dict[str, Any]
     dictamenClinico: Optional[str] = Field(None, max_length=4000)
+
+
+class SolicitudJustificacion(BaseModel):
+    sintomas_paciente: str = Field(..., min_length=3, max_length=1500, description="Motivo de consulta")
+    resultados_16pf: Dict[str, str] = Field(
+        ...,
+        min_length=1,
+        max_length=16,
+        example={"C": "Bajo - Inestabilidad", "Q4": "Alto - Tensión"},
+    )
+    diagnostico_dsm5: str = Field(..., min_length=3, max_length=200, example="F41.1 Trastorno de Ansiedad Generalizada")
+    especie_mascota: str = Field(..., min_length=3, max_length=50, example="Canino")
+
+
+class RespuestaJustificacion(BaseModel):
+    justificacion: str = Field(..., description="Texto listo para inyectar en el PDF")
+    generado_por_ia: bool = Field(..., description="False si se usó el texto de contingencia (requiere revisión)")
 
 
 @app.get("/")
@@ -141,6 +160,22 @@ TAREA:
         criterio_mae_favorable=criterio_favorable,
         fundamentacion_dsm5=fundamentacion
     )
+
+
+@app.post("/generar-justificacion-clinica", response_model=RespuestaJustificacion)
+def generar_justificacion_clinica(solicitud: SolicitudJustificacion):
+    """
+    Redacta con un LLM la justificación terapéutica del certificado MAE a partir de
+    los datos clínicos. Ante cualquier falla de la API devuelve un texto de
+    contingencia seguro (`generado_por_ia=false`).
+    """
+    texto, es_contingencia = ia_service.generar_justificacion(
+        sintomas_paciente=solicitud.sintomas_paciente,
+        resultados_16pf=solicitud.resultados_16pf,
+        diagnostico_dsm5=solicitud.diagnostico_dsm5,
+        especie_mascota=solicitud.especie_mascota,
+    )
+    return RespuestaJustificacion(justificacion=texto, generado_por_ia=not es_contingencia)
 
 
 @app.post("/generar-pdf")

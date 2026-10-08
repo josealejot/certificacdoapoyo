@@ -7,6 +7,31 @@ import LoginPage from './features/auth/LoginPage';
 
 const FASTAPI_URL = import.meta.env.VITE_API_IA_PDF_URL || 'https://mae-backend-pdf.onrender.com';
 
+// Nombres de los factores 16PF usados para describir hallazgos a la IA
+const NOMBRES_16PF = {
+  C: 'Estabilidad emocional',
+  O: 'Aprensión',
+  Q4: 'Tensión',
+  L: 'Vigilancia',
+  Q3: 'Autocontrol',
+};
+
+/**
+ * Convierte los decatipos en descriptores clínicos (solo factores alterados):
+ * <= 4 => Bajo, >= 7 => Alto. Ej: { C: 'Bajo - Estabilidad emocional (decatipo 3.5)' }
+ */
+const construirResultados16PF = (scores) => {
+  const resultado = {};
+  Object.entries(scores).forEach(([factor, valor]) => {
+    if (Number.isNaN(valor)) return;
+    const nivel = valor <= 4 ? 'Bajo' : valor >= 7 ? 'Alto' : null;
+    if (nivel) {
+      resultado[factor] = `${nivel} - ${NOMBRES_16PF[factor] || factor} (decatipo ${valor})`;
+    }
+  });
+  return resultado;
+};
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -35,7 +60,12 @@ export default function App() {
     Q3: 4.0,
   });
 
+  const [diagnosticoDsm5, setDiagnosticoDsm5] = useState('F41.1 Trastorno de Ansiedad Generalizada');
+
   const [dictamenIA, setDictamenIA] = useState(null);
+  // Texto de justificación terapéutica (editable por el psicólogo antes de emitir)
+  const [justificacion, setJustificacion] = useState('');
+  const [justificacionPorIA, setJustificacionPorIA] = useState(null);
   const [loadingIA, setLoadingIA] = useState(false);
   const [loadingPDF, setLoadingPDF] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -71,9 +101,28 @@ export default function App() {
         },
       });
       setDictamenIA(res.data);
+
+      // Justificación terapéutica redactada por IA (sin datos identificables del paciente)
+      const resultados16pf = construirResultados16PF(scores16PF);
+      if (Object.keys(resultados16pf).length === 0) {
+        setErrorMsg('Ningún factor 16PF está alterado (<=4 o >=7); no se generó justificación con IA.');
+        return;
+      }
+      const just = await axios.post(
+        `${FASTAPI_URL}/generar-justificacion-clinica`,
+        {
+          sintomas_paciente: sintomas,
+          resultados_16pf: resultados16pf,
+          diagnostico_dsm5: diagnosticoDsm5,
+          especie_mascota: mascota.especie,
+        },
+        { timeout: 90000 }
+      );
+      setJustificacion(just.data.justificacion);
+      setJustificacionPorIA(just.data.generado_por_ia);
     } catch (err) {
       console.error(err);
-      setErrorMsg('No se pudo conectar con el microservicio de IA (puerto 8000). Asegúrate de iniciar FastAPI con uvicorn.');
+      setErrorMsg('No se pudo conectar con el microservicio de IA. Verifica que el backend FastAPI esté en línea y la URL configurada.');
     } finally {
       setLoadingIA(false);
     }
@@ -84,6 +133,8 @@ export default function App() {
     setErrorMsg(null);
     setFirestoreStatus(null);
     const codigoVerificacion = `MAE-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    // La justificación revisada por el psicólogo tiene prioridad sobre la fundamentación heurística
+    const textoDictamen = justificacion.trim() || (dictamenIA ? dictamenIA.fundamentacion_dsm5 : undefined);
 
     try {
       // 1. Descarga del documento PDF
@@ -94,7 +145,7 @@ export default function App() {
           fechaExpedicion: new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }),
           paciente: paciente,
           mascota: mascota,
-          dictamenClinico: dictamenIA ? dictamenIA.fundamentacion_dsm5 : undefined,
+          dictamenClinico: textoDictamen,
         },
         { responseType: 'blob' }
       );
@@ -112,7 +163,7 @@ export default function App() {
       const guardado = await registrarCertificadoEnFirestore({
         paciente,
         mascota,
-        dictamenClinico: dictamenIA ? dictamenIA.fundamentacion_dsm5 : undefined,
+        dictamenClinico: textoDictamen,
         codigoVerificacion,
       });
 
@@ -317,6 +368,16 @@ export default function App() {
                 className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
               />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Diagnóstico DSM-5 (código y nombre)</label>
+              <input
+                type="text"
+                value={diagnosticoDsm5}
+                onChange={(e) => setDiagnosticoDsm5(e.target.value)}
+                placeholder="F41.1 Trastorno de Ansiedad Generalizada"
+                className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              />
+            </div>
             <div className="grid grid-cols-3 gap-4 pt-2">
               <div>
                 <label className="block text-xs font-semibold text-slate-700">Factor C (Estabilidad)</label>
@@ -398,6 +459,30 @@ export default function App() {
               </div>
               <p className="text-xs font-semibold text-slate-800">{dictamenIA.impresion_diagnostica_sugerida}</p>
               <p className="text-xs text-slate-600 leading-relaxed">{dictamenIA.fundamentacion_dsm5}</p>
+            </div>
+          )}
+
+          {justificacion && (
+            <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-3 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">Justificación Terapéutica</span>
+                <span
+                  className={`text-[11px] px-2 py-0.5 rounded font-semibold ${
+                    justificacionPorIA ? 'bg-violet-100 text-violet-800' : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  {justificacionPorIA ? '✨ Borrador IA' : 'Texto genérico (IA no disponible)'}
+                </span>
+              </div>
+              <textarea
+                rows="10"
+                value={justificacion}
+                onChange={(e) => setJustificacion(e.target.value)}
+                className="w-full px-3 py-2 text-xs leading-relaxed border rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              />
+              <p className="text-[11px] text-slate-500">
+                Revisa y edita este texto: el psicólogo es el responsable del contenido del certificado (Ley 1090 de 2006). Es el que se imprimirá en el PDF.
+              </p>
             </div>
           )}
         </div>

@@ -5,6 +5,19 @@ from typing import Dict, Any, Optional
 from app.core.config import settings
 
 
+_REEMPLAZOS_LATIN1 = {
+    "\u2013": "-", "\u2014": "-", "\u2018": "'", "\u2019": "'",
+    "\u201c": '"', "\u201d": '"', "\u2026": "...", "\u2022": "-", "\u00a0": " ",
+}
+
+
+def _limpiar_latin1(texto: str) -> str:
+    """La fuente Helvetica del PDF solo admite Latin-1: normaliza los caracteres que la IA suele emitir."""
+    for origen, destino in _REEMPLAZOS_LATIN1.items():
+        texto = texto.replace(origen, destino)
+    return texto.encode("latin-1", "replace").decode("latin-1")
+
+
 class CertificadoPDF(FPDF):
     """
     Extensión de FPDF con membrete y pie de página institucional/profesional
@@ -125,7 +138,7 @@ class GeneradorPDF:
             "cumpliendo criterios de soporte según el DSM-5. El vínculo afectivo con su ejemplar canino/felino actúa como facilitador "
             "de contención emocional, disminuyendo la sobrecarga fisiológica y facilitando la autorregulación."
         )
-        pdf.multi_cell(0, 5, dictamen_clinico)
+        pdf.multi_cell(0, 5, _limpiar_latin1(dictamen_clinico))
         pdf.ln(3)
 
         # Datos del Ejemplar de Apoyo Emocional

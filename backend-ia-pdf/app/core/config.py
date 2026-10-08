@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     APP_TITLE: str = "MAE Colombia - Servicio IA & Generador PDF Clínico"
     APP_VERSION: str = "1.0.0"
     PORT: int = 8000
+
+    # Configuración LLM (Google Gemini, capa gratuita) - definir en .env
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-flash-latest"
+    # Modelos de respaldo (separados por coma) si el principal está saturado
+    GEMINI_MODELOS_ALTERNOS: str = "gemini-2.5-flash,gemini-2.5-flash-lite"
+    GEMINI_TIMEOUT: float = 30.0
     
     class Config:
         env_file = ".env"

@@ -38,3 +38,7 @@ firebase-adminsdk*.json
 Thumbs.db
 dist/
 frontend/dist/
+
+# Secretos
+.env
+**/.env
